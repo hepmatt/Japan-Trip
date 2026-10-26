@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="wrap">
@@ -226,7 +226,7 @@
     <div class="inline"><input id="s-name" type="text" maxlength="30"><button type="button" class="btn ghost" id="s-save">Save</button></div>
     <label for="s-import">Load trip data</label>
     <p class="muted small">Pick a trip-data.json file. It updates the itinerary, hotels, and places, and adds any new checklist items without undoing checks.</p>
-    <input id="s-import" type="file" accept="application/json,.json">
+    <input id="s-import" type="file">
     <p class="muted small" id="s-msg" aria-live="polite"></p>
     <div class="inline end"><button type="button" class="btn ghost" id="s-out">Sign out</button><button type="button" class="btn" id="s-close">Done</button></div>
   </div>
@@ -267,6 +267,6 @@
   <button type="button" class="btn" id="taxi-close">Done</button>
 </div>
 
-<script type="module" src="app.js?v=6"></script>
+<script type="module" src="app.js?v=7"></script>
 </body>
 </html>

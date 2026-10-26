@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=6";
+import { firebaseConfig } from "./firebase-config.js?v=7";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
