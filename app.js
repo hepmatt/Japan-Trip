@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js?v=5";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -50,8 +50,8 @@ const ALL_PANELS = ["plan", "todo", "journal", "eats", "photos", "contacts", "ma
 function show(tab) {
   if (tab === "map" || tab === "contacts") tab = "info";
   if (!TABS.includes(tab)) tab = "plan";
-  ALL_PANELS.forEach(p => ($("p-" + p).hidden = !PANELS[tab].includes(p)));
-  TABS.forEach(t => $("n-" + t).setAttribute("aria-current", t === tab ? "page" : "false"));
+  ALL_PANELS.forEach(p => { const el = $("p-" + p); if (el) el.hidden = !PANELS[tab].includes(p); });
+  TABS.forEach(t => $("n-" + t)?.setAttribute("aria-current", t === tab ? "page" : "false"));
   try { localStorage.setItem("jt-tab", tab); } catch (e) {}
   window.scrollTo(0, 0);
   if (tab === "plan") { const el = $("d-" + jstDate()); if (el) el.scrollIntoView({ block: "start" }); }

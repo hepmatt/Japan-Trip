@@ -50,3 +50,6 @@ After the first load, the itinerary, checklist, and contacts work offline. Chang
 | `manifest.webmanifest`, `icons/` | Home-screen app name and icon |
 | `sw.js` | Offline caching of the app shell |
 | `firestore.rules`, `storage.rules` | Security rules to paste into the Firebase console |
+
+## Editing tip
+When you change `app.js`, `styles.css`, or `firebase-config.js`, bump the `?v=` number on their links in `index.html` (and the matching names and `CACHE` in `sw.js`). Phones then load the new files right away instead of mixing in cached copies.
