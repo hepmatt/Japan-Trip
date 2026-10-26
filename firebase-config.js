@@ -13,4 +13,11 @@
 //   appId: "1:1234567890:web:abc123"
 // };
 
-export const firebaseConfig = null;
+export const firebaseConfig = {
+  apiKey: "AIzaSyA1uRlS2WHxwNkNG8Ryc_qKDS55sg7PZvQ",
+  authDomain: "japan-trip-fa5d6.firebaseapp.com",
+  projectId: "japan-trip-fa5d6",
+  storageBucket: "japan-trip-fa5d6.firebasestorage.app",
+  messagingSenderId: "904494051863",
+  appId: "1:904494051863:web:f1f77131d199d1ef16e252"
+};

@@ -1,6 +1,6 @@
 // Offline support: keeps the app shell and Firebase SDK cached so the app opens without signal.
 // Trip data itself is cached by Firestore's offline persistence, not here.
-const CACHE = "japan-trip-v1";
+const CACHE = "japan-trip-v2";
 const SHELL = ["./", "index.html", "styles.css", "app.js", "firebase-config.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
