@@ -1,0 +1,19 @@
+rules_version = '2';
+// Paste into Firebase console > Storage > Rules, then Publish.
+// Replace the two emails with yours and your wife's, in lowercase.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function allowed() {
+      return request.auth != null
+        && request.auth.token.email in ['YOUR_EMAIL@example.com', 'WIFE_EMAIL@example.com'];
+    }
+    // Each person uploads into their own folder; both of you can view everything.
+    match /photos/{uid}/{file} {
+      allow read: if allowed();
+      allow create, update: if allowed() && request.auth.uid == uid
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if allowed() && request.auth.uid == uid;
+    }
+  }
+}
