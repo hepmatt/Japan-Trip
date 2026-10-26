@@ -82,11 +82,64 @@
     </form>
   </section>
 
-  <section class="panel" id="p-map" aria-labelledby="h-map" hidden>
-    <h2 class="sec" id="h-map">Route &amp; places</h2>
-    <p class="lede">Each place opens in Google Maps for directions.</p>
-    <div class="mapbox" id="mapbox"></div>
-    <div id="placelist"></div>
+  <section class="panel" id="p-journal" aria-labelledby="h-journal" hidden>
+    <h2 class="sec" id="h-journal">Journal</h2>
+    <p class="lede">A few lines a day. You both see every entry; only the writer can edit it.</p>
+    <form class="compose" id="j-form">
+      <div class="inline flow">
+        <select id="j-day" aria-label="Which day"></select>
+        <span class="muted small" id="j-mode"></span>
+      </div>
+      <input id="j-title" type="text" placeholder="Title (optional)" maxlength="80" aria-label="Title">
+      <textarea id="j-text" rows="5" placeholder="What happened today? What do you want to remember?" maxlength="8000" required aria-label="Entry"></textarea>
+      <div class="inline flow">
+        <label class="btn ghost uplabel" for="j-file">Add photos<input id="j-file" type="file" accept="image/*" multiple></label>
+        <span class="muted small" id="j-files"></span>
+        <span class="grow"></span>
+        <button type="button" class="btn ghost" id="j-cancel" hidden>Cancel</button>
+        <button class="btn" type="submit" id="j-save">Save entry</button>
+      </div>
+      <p class="muted small" id="j-msg" aria-live="polite"></p>
+    </form>
+    <div id="j-list"><p class="empty">Loading the journal…</p></div>
+  </section>
+
+  <section class="panel" id="p-eats" aria-labelledby="h-eats" hidden>
+    <h2 class="sec" id="h-eats">Eats &amp; drinks</h2>
+    <p class="lede">Snap it, name it, rate it. Each of you gives your own stars.</p>
+    <div class="etools">
+      <div class="pills" role="group" aria-label="Show">
+        <button type="button" id="e-all" data-k="all" aria-pressed="true">All</button>
+        <button type="button" id="e-food" data-k="food" aria-pressed="false">Food</button>
+        <button type="button" id="e-drink" data-k="drink" aria-pressed="false">Cocktails &amp; drinks</button>
+      </div>
+      <div class="inline flow">
+        <select id="e-sort" aria-label="Sort by"><option value="new">Newest first</option><option value="top">Top rated</option></select>
+        <span class="grow"></span>
+        <button type="button" class="btn" id="e-new">Add food or drink</button>
+      </div>
+    </div>
+    <form class="compose" id="e-form" hidden>
+      <div class="seg" role="radiogroup" aria-label="Type">
+        <button type="button" role="radio" id="ek-food" data-kind="food" aria-checked="true">Food</button>
+        <button type="button" role="radio" id="ek-drink" data-kind="drink" aria-checked="false">Cocktail or drink</button>
+      </div>
+      <input id="e-name" type="text" placeholder="What was it? e.g. Tuna omakase, Mai Tai" maxlength="80" required aria-label="Name">
+      <input id="e-place" type="text" placeholder="Where? e.g. KRFT, Kyoto" maxlength="80" aria-label="Place">
+      <div class="inline flow">
+        <select id="e-day" aria-label="Which day"></select>
+        <label class="btn ghost uplabel" for="e-file">Add photo<input id="e-file" type="file" accept="image/*"></label>
+        <span class="muted small" id="e-filename"></span>
+      </div>
+      <div class="inline flow"><span class="small muted">Your rating</span><div class="stars big" id="e-stars"></div></div>
+      <input id="e-note" type="text" placeholder="Notes: what stood out, would you order it again?" maxlength="200" aria-label="Notes">
+      <div class="inline end">
+        <button type="button" class="btn ghost" id="e-cancel">Cancel</button>
+        <button class="btn" type="submit" id="e-save">Save</button>
+      </div>
+      <p class="muted small" id="e-msg" aria-live="polite"></p>
+    </form>
+    <div id="e-list"><p class="empty">Loading…</p></div>
   </section>
 
   <section class="panel" id="p-contacts" aria-labelledby="h-contacts" hidden>
@@ -107,6 +160,13 @@
     </form>
   </section>
 
+  <section class="panel" id="p-map" aria-labelledby="h-map" hidden>
+    <h2 class="sec" id="h-map">Route &amp; places</h2>
+    <p class="lede">Each place opens in Google Maps for directions.</p>
+    <div class="mapbox" id="mapbox"></div>
+    <div id="placelist"></div>
+  </section>
+
   <section class="panel" id="p-photos" aria-labelledby="h-photos" hidden>
     <h2 class="sec" id="h-photos">Photos</h2>
     <p class="lede">Upload from either phone and both of you see them. Photos shrink to about 2,000 px so uploads stay quick on mobile data.</p>
@@ -125,9 +185,10 @@
 <nav class="tabs" id="tabs" aria-label="Sections" hidden><div class="in">
   <a href="#plan" id="n-plan"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Itinerary</a>
   <a href="#todo" id="n-todo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7l2 2 3-3M5 15l2 2 3-3M13 8h6M13 16h6"/></svg>To-Do</a>
-  <a href="#map" id="n-map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>Map</a>
-  <a href="#contacts" id="n-contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg>Contacts</a>
+  <a href="#journal" id="n-journal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><path d="M6 3v18M9.5 8h5M9.5 12h5"/></svg>Journal</a>
+  <a href="#eats" id="n-eats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14l-7 8z"/><path d="M12 12v7M8.5 20h7"/></svg>Eats</a>
   <a href="#photos" id="n-photos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg>Photos</a>
+  <a href="#info" id="n-info"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>Info</a>
 </div></nav>
 
 <!-- account sheet -->

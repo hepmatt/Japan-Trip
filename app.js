@@ -38,15 +38,20 @@ const S = {
   fb: null, db: null, auth: null, storage: null,
   uid: null, email: null,
   trip: undefined, todos: null, photos: null, ours: null, users: {},
-  busy: new Set(), armed: new Map(), filter: "all", lb: -1, lbList: [], unsubs: []
+  busy: new Set(), armed: new Map(), filter: "all", lb: -1, lbList: [], lbAlbum: false, albumList: [], unsubs: [],
+  journal: null, eats: null, jEdit: null, jFiles: [], eRating: 0, eKind: "all", eFile: null, eatsView: []
 };
 const days = () => (S.trip && Array.isArray(S.trip.days) ? S.trip.days : []);
 
 /* ---------- tabs ---------- */
-const TABS = ["plan", "todo", "map", "contacts", "photos"];
+const TABS = ["plan", "todo", "journal", "eats", "photos", "info"];
+const PANELS = { plan: ["plan"], todo: ["todo"], journal: ["journal"], eats: ["eats"], photos: ["photos"], info: ["contacts", "map"] };
+const ALL_PANELS = ["plan", "todo", "journal", "eats", "photos", "contacts", "map"];
 function show(tab) {
+  if (tab === "map" || tab === "contacts") tab = "info";
   if (!TABS.includes(tab)) tab = "plan";
-  TABS.forEach(t => { $("p-" + t).hidden = t !== tab; $("n-" + t).setAttribute("aria-current", t === tab ? "page" : "false"); });
+  ALL_PANELS.forEach(p => ($("p-" + p).hidden = !PANELS[tab].includes(p)));
+  TABS.forEach(t => $("n-" + t).setAttribute("aria-current", t === tab ? "page" : "false"));
   try { localStorage.setItem("jt-tab", tab); } catch (e) {}
   window.scrollTo(0, 0);
   if (tab === "plan") { const el = $("d-" + jstDate()); if (el) el.scrollIntoView({ block: "start" }); }
@@ -199,24 +204,26 @@ function dayLabel(d) {
   return x ? `${x.dow}, ${fmt(d)} · ${x.cityL}` : d;
 }
 function fillDaySelect() {
-  const sel = $("p-day"), keep = sel.value;
   const opts = [["pre", "Before the trip"], ...days().map(x => [x.d, `${fmt(x.d)} · ${x.cityL}`]), ["post", "After the trip"]];
-  sel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
-  sel.value = opts.some(o => o[0] === keep) ? keep : defaultDay();
+  ["p-day", "j-day", "e-day"].forEach(id => {
+    const sel = $(id), keep = sel.value;
+    sel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+    sel.value = opts.some(o => o[0] === keep) ? keep : defaultDay();
+  });
 }
 function renderPhotos() {
   const box = $("p-grid");
   if (!S.photos) return;
   const w = $("p-who").value;
   const list = S.photos.filter(p => w === "all" || (w === "me" ? p.by === S.uid : p.by !== S.uid));
-  if (!list.length) { S.lbList = []; box.innerHTML = `<p class="empty">${S.photos.length ? "No photos match this filter." : "No photos yet. Tap Add photos to share the first one."}</p>`; return; }
+  if (!list.length) { S.albumList = []; box.innerHTML = `<p class="empty">${S.photos.length ? "No photos match this filter." : "No photos yet. Tap Add photos to share the first one."}</p>`; return; }
   const order = ["post", ...[...tripDays()].reverse(), "pre"];
   const known = new Set(order);
   const groups = order.map(d => [d, list.filter(p => (p.day || "pre") === d)]);
   const stray = list.filter(p => !known.has(p.day || "pre"));
   if (stray.length) groups.push(["other", stray]);
   const g2 = groups.filter(g => g[1].length);
-  S.lbList = g2.flatMap(g => g[1]);
+  S.albumList = g2.flatMap(g => g[1]);
   box.innerHTML = g2.map(([d, ps]) => `<div class="pday"><h3>${esc(d === "other" ? "Other days" : dayLabel(d))} <span class="cnt">(${ps.length})</span></h3><div class="grid">${ps.map(p => `<button type="button" class="thumb" data-ph="${esc(p.id)}" aria-label="Photo by ${esc(nameOf(p.by))}${p.caption ? ": " + esc(p.caption) : ""}"><img loading="lazy" src="${esc(p.url)}" alt="${esc(p.caption || "Trip photo")}"><span class="by">${esc(nameOf(p.by))}</span></button>`).join("")}</div></div>`).join("");
 }
 async function shrink(file) {
@@ -233,18 +240,68 @@ async function shrink(file) {
   throw { code: "unsupported" };
 }
 
-/* ---------- lightbox ---------- */
-function openLb(id) { const i = S.lbList.findIndex(p => p.id === id); if (i < 0) return; S.lb = i; paintLb(); $("lb").hidden = false; $("lb-close").focus(); }
+/* ---------- lightbox (album, journal, and eats photos share it) ---------- */
+function openViewer(list, i, album) {
+  if (!list.length) return;
+  S.lbList = list; S.lbAlbum = !!album; S.lb = Math.max(0, Math.min(i, list.length - 1));
+  paintLb(); $("lb").hidden = false; $("lb-close").focus();
+}
+function openLb(id) { const i = S.albumList.findIndex(p => p.id === id); if (i >= 0) openViewer(S.albumList, i, true); }
 function paintLb() {
   const p = S.lbList[S.lb]; if (!p) { closeLb(); return; }
   $("lb-img").src = p.url; $("lb-img").alt = p.caption || "Trip photo";
   $("lb-pos").textContent = `${S.lb + 1} of ${S.lbList.length}`;
   $("lb-info").textContent = `${dayLabel(p.day || "pre")} · by ${nameOf(p.by)}${p.caption ? " · " + p.caption : ""}`;
-  const mine = p.by === S.uid;
-  $("lb-cap").hidden = !mine; $("lb-save").hidden = !mine; $("lb-cap").value = p.caption || "";
-  $("lb-del").hidden = !mine; $("lb-del").classList.remove("arm"); $("lb-del").textContent = "Delete";
+  const editable = S.lbAlbum && p.by === S.uid;
+  $("lb-cap").hidden = !editable; $("lb-save").hidden = !editable; $("lb-cap").value = p.caption || "";
+  $("lb-del").hidden = !editable; $("lb-del").classList.remove("arm"); $("lb-del").textContent = "Delete";
 }
 function closeLb() { $("lb").hidden = true; S.lb = -1; }
+
+/* ---------- journal ---------- */
+function renderJournal() {
+  const box = $("j-list");
+  if (!S.journal) return;
+  if (!S.journal.length) { box.innerHTML = `<p class="empty">No entries yet. Write the first one above.</p>`; return; }
+  const order = ["post", ...[...tripDays()].reverse(), "pre"];
+  const known = new Set(order);
+  const groups = order.map(d => [d, S.journal.filter(e => (e.day || "pre") === d)]);
+  const stray = S.journal.filter(e => !known.has(e.day || "pre"));
+  if (stray.length) groups.push(["other", stray]);
+  box.innerHTML = groups.filter(g => g[1].length).map(([d, es]) => `<div class="jday"><h3>${esc(d === "other" ? "Other days" : dayLabel(d))}</h3>${es.map(e => {
+    const mine = e.by === S.uid, armed = S.armed.has("j:" + e.id);
+    const when = e.at ? new Date(e.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    return `<article class="entry"><div class="meta"><span><span class="by">${esc(nameOf(e.by) === "you" ? "You" : nameOf(e.by))}</span> wrote</span><span>${esc(when)}${e.edited ? " · edited" : ""}</span></div>${e.title ? `<h4>${esc(e.title)}</h4>` : ""}<div class="txt">${esc(e.text)}</div>${(e.photos || []).length ? `<div class="minigrid">${e.photos.map((ph, i) => `<button type="button" class="thumb" data-jph="${esc(e.id)}:${i}" aria-label="Open photo ${i + 1}"><img loading="lazy" src="${esc(ph.url)}" alt=""></button>`).join("")}</div>` : ""}${mine ? `<div class="acts"><button type="button" class="linkbtn" data-jedit="${esc(e.id)}">Edit</button><button type="button" class="linkbtn${armed ? " arm" : ""}" data-jdel="${esc(e.id)}">${armed ? "Tap again to delete" : "Delete"}</button></div>` : ""}</article>`;
+  }).join("")}</div>`).join("");
+}
+function resetJournalForm() {
+  S.jEdit = null; S.jFiles = [];
+  $("j-title").value = ""; $("j-text").value = ""; $("j-files").textContent = ""; $("j-mode").textContent = "";
+  $("j-cancel").hidden = true; $("j-save").textContent = "Save entry"; $("j-day").value = defaultDay();
+}
+
+/* ---------- eats & drinks ---------- */
+function starsRO(n) { const r = Math.round(n || 0); return `<span class="stars ro" aria-label="${r} of 5 stars">${[1, 2, 3, 4, 5].map(i => `<span class="${i <= r ? "on" : ""}">★</span>`).join("")}</span>`; }
+function starsInput(id, n) { return `<span class="stars" role="group" aria-label="Your rating">${[1, 2, 3, 4, 5].map(i => `<button type="button" class="${i <= (n || 0) ? "on" : ""}" data-rate="${esc(id)}:${i}" aria-label="${i} star${i > 1 ? "s" : ""}">★</button>`).join("")}</span>`; }
+function avgOf(e) { const v = Object.values(e.ratings || {}).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; }
+function paintFormStars() { $("e-stars").innerHTML = [1, 2, 3, 4, 5].map(i => `<button type="button" class="${i <= S.eRating ? "on" : ""}" data-frate="${i}" aria-label="${i} star${i > 1 ? "s" : ""}">★</button>`).join(""); }
+function renderEats() {
+  const box = $("e-list");
+  if (!S.eats) return;
+  let list = S.eats.filter(e => S.eKind === "all" || e.kind === S.eKind);
+  if ($("e-sort").value === "top") list = [...list].sort((a, b) => avgOf(b) - avgOf(a) || (b.at || 0) - (a.at || 0));
+  S.eatsView = list;
+  if (!list.length) { box.innerHTML = `<p class="empty">${S.eats.length ? "Nothing in this filter yet." : "Nothing logged yet. Tap Add food or drink after your first great bite."}</p>`; return; }
+  const raters = [...new Set([S.uid, ...Object.keys(S.users)])];
+  box.innerHTML = `<div class="elist">${list.map(e => {
+    const mine = e.by === S.uid, armed = S.armed.has("e:" + e.id), avg = avgOf(e);
+    const rows = raters.map(uid => {
+      const n = (e.ratings || {})[uid] || 0, who = uid === S.uid ? "You" : (S.users[uid]?.name || "Your partner");
+      return `<div class="rate"><span>${esc(who)}</span>${uid === S.uid ? starsInput(e.id, n) : (n ? starsRO(n) : `<span class="muted small">Not rated yet</span>`)}</div>`;
+    }).join("");
+    return `<article class="eat">${e.photo ? `<button type="button" class="pic" data-eph="${esc(e.id)}" aria-label="Open photo of ${esc(e.name)}"><img loading="lazy" src="${esc(e.photo.url)}" alt="${esc(e.name)}"></button>` : ""}<div class="body"><div class="top"><div><h4>${esc(e.name)}</h4><div class="where">${esc([e.place, e.day ? dayLabel(e.day).split(" · ")[0] : ""].filter(Boolean).join(" · "))}</div></div><div style="text-align:right"><span class="kind ${e.kind === "drink" ? "drink" : ""}">${e.kind === "drink" ? "Drink" : "Food"}</span>${avg ? `<div class="avg">${avg.toFixed(1)} ★</div>` : ""}</div></div><div class="rates">${rows}</div>${e.note ? `<div class="note">${esc(nameOf(e.by) === "you" ? "You" : nameOf(e.by))}: ${esc(e.note)}</div>` : ""}${mine ? `<div style="display:flex;justify-content:flex-end"><button type="button" class="linkbtn${armed ? " arm" : ""}" data-edel="${esc(e.id)}">${armed ? "Tap again to delete" : "Delete"}</button></div>` : ""}</div></article>`;
+  }).join("")}</div>`;
+}
 
 /* ---------- boot ---------- */
 $("t-cat").innerHTML = CATS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
@@ -289,9 +346,9 @@ async function start() {
   A.onAuthStateChanged(auth, user => {
     S.unsubs.forEach(u => u()); S.unsubs = [];
     if (!user) {
-      Object.assign(S, { uid: null, email: null, trip: undefined, todos: null, photos: null, ours: null, users: {} });
+      Object.assign(S, { uid: null, email: null, trip: undefined, todos: null, photos: null, ours: null, users: {}, journal: null, eats: null });
       $("gate").hidden = false; $("tabs").hidden = true; $("acct-btn").hidden = true;
-      TABS.forEach(t => ($("p-" + t).hidden = true));
+      ALL_PANELS.forEach(t => ($("p-" + t).hidden = true));
       return;
     }
     S.uid = user.uid; S.email = user.email;
@@ -364,6 +421,85 @@ async function start() {
     } catch (err) { $("lb-info").textContent = "Delete didn't go through. Try again."; }
   };
 
+  /* journal */
+  $("j-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const text = $("j-text").value.trim(); if (!text) return;
+    $("j-save").disabled = true; $("j-msg").textContent = S.jFiles.length ? "Uploading photos…" : "Saving…";
+    try {
+      const added = [];
+      for (const f of S.jFiles) added.push(await uploadOne(f, ST));
+      const base = { day: $("j-day").value, title: $("j-title").value.trim(), text };
+      if (S.jEdit) {
+        const old = (S.journal || []).find(x => x.id === S.jEdit);
+        await F.updateDoc(F.doc(db, "journal", S.jEdit), { ...base, photos: [...(old?.photos || []), ...added], edited: Date.now() });
+      } else {
+        await F.addDoc(F.collection(db, "journal"), { ...base, photos: added, by: S.uid, at: Date.now() });
+      }
+      resetJournalForm(); $("j-msg").textContent = "Saved.";
+    } catch (err) { console.error(err); $("j-msg").textContent = "Entry didn't save. " + uploadError(err?.code); }
+    $("j-save").disabled = false;
+  });
+  $("j-cancel").onclick = () => { resetJournalForm(); $("j-msg").textContent = ""; };
+
+  /* eats */
+  $("e-new").onclick = () => { S.eRating = 0; S.eFile = null; paintFormStars(); document.querySelectorAll("[data-kind]").forEach(b => b.setAttribute("aria-checked", b.dataset.kind === "food")); $("e-form").hidden = false; $("e-new").hidden = true; $("e-day").value = defaultDay(); $("e-name").focus(); };
+  $("e-cancel").onclick = () => { $("e-form").reset(); $("e-form").hidden = true; $("e-new").hidden = false; $("e-filename").textContent = ""; $("e-msg").textContent = ""; };
+  $("e-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = $("e-name").value.trim(); if (!name) return;
+    $("e-save").disabled = true; $("e-msg").textContent = S.eFile ? "Uploading photo…" : "Saving…";
+    try {
+      const photo = S.eFile ? await uploadOne(S.eFile, ST) : null;
+      const kind = $("ek-drink").getAttribute("aria-checked") === "true" ? "drink" : "food";
+      await F.addDoc(F.collection(db, "eats"), { kind, name, place: $("e-place").value.trim(), day: $("e-day").value, note: $("e-note").value.trim(), photo, ratings: S.eRating ? { [S.uid]: S.eRating } : {}, by: S.uid, at: Date.now() });
+      $("e-cancel").click();
+    } catch (err) { console.error(err); $("e-msg").textContent = "Didn't save. " + uploadError(err?.code); }
+    $("e-save").disabled = false;
+  });
+  document.addEventListener("click", async e => {
+    const r = e.target.closest("[data-rate]");
+    if (r) {
+      const [id, n] = r.dataset.rate.split(":"); const item = (S.eats || []).find(x => x.id === id); if (!item || S.busy.has("e" + id)) return;
+      const cur = (item.ratings || {})[S.uid] || 0, val = cur === +n ? 0 : +n;
+      S.busy.add("e" + id);
+      try { await F.updateDoc(F.doc(db, "eats", id), { ["ratings." + S.uid]: val }); } catch (err) { toast("e-list", "Rating didn't save. Try again."); }
+      S.busy.delete("e" + id); return;
+    }
+    const fr = e.target.closest("[data-frate]");
+    if (fr) { S.eRating = S.eRating === +fr.dataset.frate ? 0 : +fr.dataset.frate; paintFormStars(); return; }
+    const kb = e.target.closest("[data-kind]");
+    if (kb) { document.querySelectorAll("[data-kind]").forEach(b => b.setAttribute("aria-checked", b === kb)); return; }
+    const ed = e.target.closest("[data-edel]");
+    if (ed) {
+      const id = ed.dataset.edel, key = "e:" + id;
+      if (!S.armed.has(key)) { S.armed.set(key, setTimeout(() => { S.armed.delete(key); renderEats(); }, 3000)); renderEats(); return; }
+      clearTimeout(S.armed.get(key)); S.armed.delete(key);
+      const item = (S.eats || []).find(x => x.id === id);
+      try { if (item?.photo?.path) await ST.deleteObject(ST.ref(storage, item.photo.path)).catch(() => {}); await F.deleteDoc(F.doc(db, "eats", id)); }
+      catch (err) { toast("e-list", "Delete didn't go through."); }
+      return;
+    }
+    const je = e.target.closest("[data-jedit]");
+    if (je) {
+      const item = (S.journal || []).find(x => x.id === je.dataset.jedit); if (!item) return;
+      S.jEdit = item.id; S.jFiles = [];
+      $("j-day").value = item.day || "pre"; $("j-title").value = item.title || ""; $("j-text").value = item.text || "";
+      $("j-mode").textContent = "Editing your entry"; $("j-cancel").hidden = false; $("j-save").textContent = "Save changes"; $("j-files").textContent = "";
+      $("j-form").scrollIntoView({ block: "start" }); $("j-text").focus();
+      return;
+    }
+    const jd = e.target.closest("[data-jdel]");
+    if (jd) {
+      const id = jd.dataset.jdel, key = "j:" + id;
+      if (!S.armed.has(key)) { S.armed.set(key, setTimeout(() => { S.armed.delete(key); renderJournal(); }, 3000)); renderJournal(); return; }
+      clearTimeout(S.armed.get(key)); S.armed.delete(key);
+      const item = (S.journal || []).find(x => x.id === id);
+      try { for (const ph of item?.photos || []) await ST.deleteObject(ST.ref(storage, ph.path)).catch(() => {}); await F.deleteDoc(F.doc(db, "journal", id)); if (S.jEdit === id) resetJournalForm(); }
+      catch (err) { toast("j-list", "Delete didn't go through."); }
+    }
+  });
+
   /* settings */
   $("acct-btn").onclick = () => { $("who-email").textContent = "Signed in as " + (S.email || ""); $("s-name").value = S.users[S.uid]?.name || ""; $("s-msg").textContent = ""; $("sheet").hidden = false; $("s-name").focus(); };
   $("s-close").onclick = () => ($("sheet").hidden = true);
@@ -386,13 +522,13 @@ function subscribe(F) {
   };
   S.unsubs.push(F.onSnapshot(F.doc(db, "trip", "main"), snap => {
     S.trip = snap.exists() ? snap.data() : null;
-    renderHeader(); renderPlan(); renderMap(); renderContacts(); fillDaySelect(); renderPhotos(); tick();
+    renderHeader(); renderPlan(); renderMap(); renderContacts(); fillDaySelect(); renderPhotos(); renderJournal(); renderEats(); tick();
   }, onErr("trip")));
   S.unsubs.push(F.onSnapshot(F.collection(db, "todos"), snap => {
     S.todos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderTodo();
   }, onErr("todos")));
   S.unsubs.push(F.onSnapshot(F.query(F.collection(db, "photos"), F.orderBy("at", "desc"), F.limit(2000)), snap => {
-    S.photos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderPhotos(); if (!$("lb").hidden) paintLb();
+    S.photos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderPhotos(); if (!$("lb").hidden && S.lbAlbum) { S.lbList = S.albumList; paintLb(); }
   }, onErr("photos")));
   S.unsubs.push(F.onSnapshot(F.query(F.collection(db, "contacts"), F.orderBy("at", "asc")), snap => {
     S.ours = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderOurs();
@@ -405,28 +541,40 @@ function subscribe(F) {
       const guess = (S.email || "").split("@")[0].replace(/[._\d]+/g, " ").trim().split(" ")[0] || "Me";
       F.setDoc(F.doc(db, "users", S.uid), { name: guess.charAt(0).toUpperCase() + guess.slice(1) }, { merge: true }).catch(() => {});
     }
-    renderTodo(); renderPhotos();
+    renderTodo(); renderPhotos(); renderJournal(); renderEats();
   }, onErr("users")));
+  S.unsubs.push(F.onSnapshot(F.query(F.collection(db, "journal"), F.orderBy("at", "desc"), F.limit(1000)), snap => {
+    S.journal = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderJournal();
+  }, onErr("journal")));
+  S.unsubs.push(F.onSnapshot(F.query(F.collection(db, "eats"), F.orderBy("at", "desc"), F.limit(1000)), snap => {
+    S.eats = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderEats();
+  }, onErr("eats")));
 }
 
+async function uploadOne(file, ST) {
+  const { blob, type, ext, w, h } = await shrink(file);
+  const path = `photos/${S.uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const r = ST.ref(S.storage, path);
+  await ST.uploadBytes(r, blob, { contentType: type, cacheControl: "public,max-age=31536000" });
+  return { path, url: await ST.getDownloadURL(r), w, h };
+}
+function uploadError(code) {
+  return code === "unsupported" ? "That file type isn't supported. Pick photos from the Photos library so they convert to JPEG."
+    : code === "storage/unauthorized" ? "Upload was refused. Check the Storage security rules."
+    : code === "storage/quota-exceeded" ? "Photo storage is full."
+    : "Check your connection and try again.";
+}
 async function uploadFiles(files, F, ST) {
   const st = $("p-status"), day = $("p-day").value; let ok = 0, fail = 0, why = "";
   for (let i = 0; i < files.length; i++) {
     st.textContent = `Uploading ${i + 1} of ${files.length}…`;
     try {
-      const { blob, type, ext, w, h } = await shrink(files[i]);
-      const path = `photos/${S.uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const r = ST.ref(S.storage, path);
-      await ST.uploadBytes(r, blob, { contentType: type, cacheControl: "public,max-age=31536000" });
-      const url = await ST.getDownloadURL(r);
+      const { path, url, w, h } = await uploadOne(files[i], ST);
       await F.addDoc(F.collection(S.db, "photos"), { path, url, by: S.uid, day, caption: "", at: Date.now(), w, h });
       ok++;
     } catch (e) { fail++; why = e?.code || ""; console.error(e); }
   }
-  const msg = why === "unsupported" ? "That file type isn't supported. Pick photos from the Photos library so they convert to JPEG."
-    : why === "storage/unauthorized" ? "Upload was refused. Check the Storage security rules."
-    : why === "storage/quota-exceeded" ? "Photo storage is full."
-    : "Check your connection and try again.";
+  const msg = uploadError(why);
   st.textContent = fail ? `${ok} uploaded, ${fail} failed. ${msg}` : `${ok} photo${ok === 1 ? "" : "s"} added.`;
   $("p-file").value = "";
 }
@@ -466,6 +614,19 @@ document.addEventListener("click", e => {
   const tx = e.target.closest("[data-taxi]");
   if (tx) { const h = (S.trip?.hotels || [])[+tx.dataset.taxi]; if (!h) return; $("taxi-jp").textContent = h.jp; $("taxi-en").textContent = h.en || ""; $("taxi").hidden = false; $("taxi-close").focus(); return; }
   const th = e.target.closest("[data-ph]"); if (th) { openLb(th.dataset.ph); }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "j-file") { S.jFiles = [...e.target.files]; $("j-files").textContent = S.jFiles.length ? `${S.jFiles.length} photo${S.jFiles.length > 1 ? "s" : ""} ready` : ""; e.target.value = ""; }
+  if (e.target.id === "e-file") { S.eFile = e.target.files[0] || null; $("e-filename").textContent = S.eFile ? "Photo ready" : ""; e.target.value = ""; }
+  if (e.target.id === "e-sort") renderEats();
+});
+document.addEventListener("click", e => {
+  const k = e.target.closest(".etools .pills button");
+  if (k) { S.eKind = k.dataset.k; document.querySelectorAll(".etools .pills button").forEach(x => x.setAttribute("aria-pressed", x === k)); renderEats(); return; }
+  const jp = e.target.closest("[data-jph]");
+  if (jp) { const [id, i] = jp.dataset.jph.split(":"); const en = (S.journal || []).find(x => x.id === id); if (en) openViewer(en.photos.map(ph => ({ url: ph.url, day: en.day, by: en.by, caption: en.title || "" })), +i, false); return; }
+  const ep = e.target.closest("[data-eph]");
+  if (ep) { const list = S.eatsView.filter(x => x.photo); const i = list.findIndex(x => x.id === ep.dataset.eph); openViewer(list.map(x => ({ url: x.photo.url, day: x.day, by: x.by, caption: [x.name, x.place].filter(Boolean).join(" at ") })), i, false); }
 });
 $("taxi-close").onclick = () => ($("taxi").hidden = true);
 $("lb-close").onclick = closeLb;
