@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=5";
+import { firebaseConfig } from "./firebase-config.js?v=6";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -39,16 +39,16 @@ const S = {
   uid: null, email: null,
   trip: undefined, todos: null, photos: null, ours: null, users: {},
   busy: new Set(), armed: new Map(), filter: "all", lb: -1, lbList: [], lbAlbum: false, albumList: [], unsubs: [],
-  journal: null, eats: null, jEdit: null, jFiles: [], eRating: 0, eKind: "all", eFile: null, eatsView: []
+  journal: null, eats: null, tickets: null, kFile: null, tv: { list: [], i: 0 }, wake: null, jEdit: null, jFiles: [], eRating: 0, eKind: "all", eFile: null, eatsView: []
 };
 const days = () => (S.trip && Array.isArray(S.trip.days) ? S.trip.days : []);
 
 /* ---------- tabs ---------- */
 const TABS = ["plan", "todo", "journal", "eats", "photos", "info"];
-const PANELS = { plan: ["plan"], todo: ["todo"], journal: ["journal"], eats: ["eats"], photos: ["photos"], info: ["contacts", "map"] };
-const ALL_PANELS = ["plan", "todo", "journal", "eats", "photos", "contacts", "map"];
+const PANELS = { plan: ["plan"], todo: ["todo"], journal: ["journal"], eats: ["eats"], photos: ["photos"], info: ["tickets", "contacts", "map"] };
+const ALL_PANELS = ["plan", "todo", "journal", "eats", "photos", "tickets", "contacts", "map"];
 function show(tab) {
-  if (tab === "map" || tab === "contacts") tab = "info";
+  if (tab === "map" || tab === "contacts" || tab === "tickets") tab = "info";
   if (!TABS.includes(tab)) tab = "plan";
   ALL_PANELS.forEach(p => { const el = $("p-" + p); if (el) el.hidden = !PANELS[tab].includes(p); });
   TABS.forEach(t => $("n-" + t)?.setAttribute("aria-current", t === tab ? "page" : "false"));
@@ -93,7 +93,8 @@ function renderPlan() {
     const evs = (x.ev || []).filter(e => S.filter === "all" || e.s === S.filter);
     let now = -1; if (x.d === today) evs.forEach((e, i) => { if (e.t <= nowT) now = i; });
     const items = evs.map((e, i) => `<li class="ev ${esc(e.s)}${i === now ? " now" : ""}"><span class="t">${esc(e.t)}</span><div class="card"><div class="row"><h4>${esc(e.h)}</h4><span class="tag ${esc(e.s)}">${TAG[e.s] || ""}</span></div>${e.p ? `<p>${esc(e.p)}</p>` : ""}${e.steps ? `<ol class="steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}</div></li>`).join("");
-    return `<section class="day" id="d-${esc(x.d)}"><div class="day-h"><h3>${esc(x.dow)}, ${fmt(x.d)}</h3><span class="city ${esc(x.city)}">${esc(x.cityL)}</span></div><p class="stay">${esc(x.stay)}</p>${items ? `<ol class="rail">${items}</ol>` : `<p class="empty">Nothing in this filter.</p>`}</section>`;
+    const nt = (S.tickets || []).filter(k => k.day === x.d).length;
+    return `<section class="day" id="d-${esc(x.d)}"><div class="day-h"><h3>${esc(x.dow)}, ${fmt(x.d)}</h3><span class="city ${esc(x.city)}">${esc(x.cityL)}</span>${nt ? `<button type="button" class="tixbtn" data-tday="${esc(x.d)}">Tickets (${nt})</button>` : ""}</div><p class="stay">${esc(x.stay)}</p>${items ? `<ol class="rail">${items}</ol>` : `<p class="empty">Nothing in this filter.</p>`}</section>`;
   }).join("");
 }
 
@@ -205,7 +206,7 @@ function dayLabel(d) {
 }
 function fillDaySelect() {
   const opts = [["pre", "Before the trip"], ...days().map(x => [x.d, `${fmt(x.d)} · ${x.cityL}`]), ["post", "After the trip"]];
-  ["p-day", "j-day", "e-day"].forEach(id => {
+  ["p-day", "j-day", "e-day", "k-day"].forEach(id => {
     const sel = $(id), keep = sel.value;
     sel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
     sel.value = opts.some(o => o[0] === keep) ? keep : defaultDay();
@@ -257,6 +258,46 @@ function paintLb() {
   $("lb-del").hidden = !editable; $("lb-del").classList.remove("arm"); $("lb-del").textContent = "Delete";
 }
 function closeLb() { $("lb").hidden = true; S.lb = -1; }
+
+/* ---------- tickets ---------- */
+function sortedTickets() { return [...(S.tickets || [])].sort((a, b) => String(a.day || "").localeCompare(String(b.day || "")) || String(a.time || "").localeCompare(String(b.time || "")) || String(a.order || a.id).localeCompare(String(b.order || b.id))); }
+function ticketWhen(k) { const d = k.day && /^\d{4}-/.test(k.day) ? dayLabel(k.day).split(" · ")[0] : (k.day ? dayLabel(k.day) : ""); return [d, k.time].filter(Boolean).join(", "); }
+function renderTickets() {
+  const box = $("k-list");
+  if (!S.tickets) return;
+  const list = sortedTickets();
+  if (!list.length) { box.innerHTML = `<p class="empty">No tickets yet. Add one, or load a trip data file that includes them.</p>`; return; }
+  box.innerHTML = `<div class="tix">${list.map(k => {
+    const armed = S.armed.has("k:" + k.id);
+    return `<div class="tick"><h4>${esc(k.title)}</h4><div class="when">${esc(ticketWhen(k))}${k.holder ? " · " + esc(k.holder) : ""}</div>${k.number ? `<div class="num">${esc(k.number)}</div>` : ""}${k.note ? `<div class="when">${esc(k.note)}</div>` : ""}<div class="acts">${k.img ? `<button type="button" class="show" data-tshow="${esc(k.id)}">Show ticket</button>` : ""}${k.link ? `<a href="${esc(k.link)}" target="_blank" rel="noopener">Open link</a>` : ""}${k.number ? `<button type="button" data-copy="${esc(k.number)}">Copy number</button>` : ""}<button type="button" class="${armed ? "arm" : ""}" data-kdel="${esc(k.id)}">${armed ? "Tap again to delete" : "Delete"}</button></div></div>`;
+  }).join("")}</div>`;
+}
+async function openTickets(list, i) {
+  if (!list.length) return;
+  S.tv = { list, i: Math.max(0, i) }; paintTv(); $("tv").hidden = false; $("tv-close").focus();
+  try { if ("wakeLock" in navigator) S.wake = await navigator.wakeLock.request("screen"); } catch (e) {}
+}
+function paintTv() {
+  const { list, i } = S.tv, k = list[i]; if (!k) return;
+  $("tv-pos").textContent = list.length > 1 ? `Ticket ${i + 1} of ${list.length}` : "";
+  $("tv-title").textContent = k.title || "Ticket";
+  $("tv-when").textContent = [ticketWhen(k), k.holder].filter(Boolean).join(" · ");
+  const img = $("tv-img");
+  if (k.img) { img.hidden = false; img.src = k.img; img.alt = "Ticket code for " + (k.title || "ticket"); img.style.imageRendering = String(k.img).startsWith("data:image/png") ? "pixelated" : "auto"; }
+  else { img.hidden = true; img.removeAttribute("src"); }
+  $("tv-num").textContent = k.number || "";
+  $("tv-note").textContent = k.note || "";
+  const a = $("tv-link"); if (k.link) { a.hidden = false; a.href = k.link; } else a.hidden = true;
+  $("tv-prev").disabled = i === 0; $("tv-next").disabled = i >= list.length - 1;
+}
+function closeTv() { $("tv").hidden = true; try { S.wake && S.wake.release(); } catch (e) {} S.wake = null; }
+async function shrinkToDataURL(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const s = Math.min(1, 1100 / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+  const ctx = cv.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", 0.88);
+}
 
 /* ---------- journal ---------- */
 function renderJournal() {
@@ -346,7 +387,7 @@ async function start() {
   A.onAuthStateChanged(auth, user => {
     S.unsubs.forEach(u => u()); S.unsubs = [];
     if (!user) {
-      Object.assign(S, { uid: null, email: null, trip: undefined, todos: null, photos: null, ours: null, users: {}, journal: null, eats: null });
+      Object.assign(S, { uid: null, email: null, trip: undefined, todos: null, photos: null, ours: null, users: {}, journal: null, eats: null, tickets: null });
       $("gate").hidden = false; $("tabs").hidden = true; $("acct-btn").hidden = true;
       ALL_PANELS.forEach(t => ($("p-" + t).hidden = true));
       return;
@@ -420,6 +461,27 @@ async function start() {
       await F.deleteDoc(F.doc(db, "photos", p.id)); closeLb();
     } catch (err) { $("lb-info").textContent = "Delete didn't go through. Try again."; }
   };
+
+  /* tickets */
+  $("k-new").onclick = () => { S.kFile = null; $("k-form").hidden = false; $("k-new").hidden = true; $("k-day").value = defaultDay(); $("k-title").focus(); };
+  $("k-cancel").onclick = () => { $("k-form").reset(); $("k-form").hidden = true; $("k-new").hidden = false; $("k-filename").textContent = ""; $("k-msg").textContent = ""; S.kFile = null; };
+  $("k-form").addEventListener("submit", async e => {
+    e.preventDefault(); const title = $("k-title").value.trim(); if (!title) return;
+    $("k-save").disabled = true; $("k-msg").textContent = "Saving…";
+    try {
+      const img = S.kFile ? await shrinkToDataURL(S.kFile) : "";
+      await F.addDoc(F.collection(db, "tickets"), { title, day: $("k-day").value, time: $("k-time").value, number: $("k-number").value.trim(), link: $("k-link").value.trim(), note: $("k-note").value.trim(), holder: "", img, by: S.uid, at: Date.now() });
+      $("k-cancel").click();
+    } catch (err) { console.error(err); $("k-msg").textContent = "Ticket didn't save. If you added a screenshot, try a smaller one."; }
+    $("k-save").disabled = false;
+  });
+  document.addEventListener("click", async e => {
+    const kd = e.target.closest("[data-kdel]"); if (!kd) return;
+    const id = kd.dataset.kdel, key = "k:" + id;
+    if (!S.armed.has(key)) { S.armed.set(key, setTimeout(() => { S.armed.delete(key); renderTickets(); }, 3000)); renderTickets(); return; }
+    clearTimeout(S.armed.get(key)); S.armed.delete(key);
+    F.deleteDoc(F.doc(db, "tickets", id)).catch(() => toast("k-list", "Delete didn't go through."));
+  });
 
   /* journal */
   $("j-form").addEventListener("submit", async e => {
@@ -543,6 +605,9 @@ function subscribe(F) {
     }
     renderTodo(); renderPhotos(); renderJournal(); renderEats();
   }, onErr("users")));
+  S.unsubs.push(F.onSnapshot(F.collection(db, "tickets"), snap => {
+    S.tickets = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderTickets(); renderPlan();
+  }, onErr("tickets")));
   S.unsubs.push(F.onSnapshot(F.query(F.collection(db, "journal"), F.orderBy("at", "desc"), F.limit(1000)), snap => {
     S.journal = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderJournal();
   }, onErr("journal")));
@@ -583,11 +648,12 @@ async function importTrip(file, F) {
   const msg = $("s-msg");
   try {
     const data = JSON.parse(await file.text());
-    if (!data || !Array.isArray(data.days)) throw new Error("bad");
-    const { todos = [], ...trip } = data;
+    if (!data || (!Array.isArray(data.days) && !Array.isArray(data.tickets))) throw new Error("bad");
+    const { todos = [], tickets = [], ...trip } = data;
     const existing = new Set((await F.getDocs(F.collection(S.db, "todos"))).docs.map(d => d.id));
     const batch = F.writeBatch(S.db);
-    batch.set(F.doc(S.db, "trip", "main"), { ...trip, updatedAt: Date.now() });
+    if (Array.isArray(trip.days)) batch.set(F.doc(S.db, "trip", "main"), { ...trip, updatedAt: Date.now() });
+    tickets.forEach(k => { if (k && k.id && k.title) { const { id, ...rest } = k; batch.set(F.doc(S.db, "tickets", String(id)), { ...rest, by: S.uid, at: Date.now() }); } });
     let added = 0, updated = 0;
     todos.forEach(t => {
       if (!t || !t.id || !t.text) return;
@@ -597,7 +663,7 @@ async function importTrip(file, F) {
       else { batch.set(r, { ...rest, done: false }); added++; }
     });
     await batch.commit();
-    msg.textContent = `Trip loaded: ${trip.days.length} days, ${added} new checklist items, ${updated} updated.`;
+    msg.textContent = [Array.isArray(trip.days) ? `Trip loaded: ${trip.days.length} days` : "", `${added} new checklist items, ${updated} updated`, tickets.length ? `${tickets.length} tickets` : ""].filter(Boolean).join(", ") + ".";
   } catch (e) {
     console.error(e);
     msg.textContent = e?.message === "bad" ? "That file isn't a trip-data.json file." : "Import didn't finish. Check your connection and try again.";
@@ -619,20 +685,28 @@ document.addEventListener("change", e => {
   if (e.target.id === "j-file") { S.jFiles = [...e.target.files]; $("j-files").textContent = S.jFiles.length ? `${S.jFiles.length} photo${S.jFiles.length > 1 ? "s" : ""} ready` : ""; e.target.value = ""; }
   if (e.target.id === "e-file") { S.eFile = e.target.files[0] || null; $("e-filename").textContent = S.eFile ? "Photo ready" : ""; e.target.value = ""; }
   if (e.target.id === "e-sort") renderEats();
+  if (e.target.id === "k-file") { S.kFile = e.target.files[0] || null; $("k-filename").textContent = S.kFile ? "Image ready" : ""; e.target.value = ""; }
 });
 document.addEventListener("click", e => {
   const k = e.target.closest(".etools .pills button");
   if (k) { S.eKind = k.dataset.k; document.querySelectorAll(".etools .pills button").forEach(x => x.setAttribute("aria-pressed", x === k)); renderEats(); return; }
+  const ts = e.target.closest("[data-tshow]");
+  if (ts) { const list = sortedTickets().filter(k => k.img); openTickets(list, list.findIndex(k => k.id === ts.dataset.tshow)); return; }
+  const td2 = e.target.closest("[data-tday]");
+  if (td2) { const all = sortedTickets().filter(k => k.day === td2.dataset.tday); const withImg = all.filter(k => k.img); if (withImg.length) openTickets(withImg, 0); else if (all[0]?.link) window.open(all[0].link, "_blank", "noopener"); else show("info"); return; }
   const jp = e.target.closest("[data-jph]");
   if (jp) { const [id, i] = jp.dataset.jph.split(":"); const en = (S.journal || []).find(x => x.id === id); if (en) openViewer(en.photos.map(ph => ({ url: ph.url, day: en.day, by: en.by, caption: en.title || "" })), +i, false); return; }
   const ep = e.target.closest("[data-eph]");
   if (ep) { const list = S.eatsView.filter(x => x.photo); const i = list.findIndex(x => x.id === ep.dataset.eph); openViewer(list.map(x => ({ url: x.photo.url, day: x.day, by: x.by, caption: [x.name, x.place].filter(Boolean).join(" at ") })), i, false); }
 });
 $("taxi-close").onclick = () => ($("taxi").hidden = true);
+$("tv-close").onclick = closeTv;
+$("tv-prev").onclick = () => { if (S.tv.i > 0) { S.tv.i--; paintTv(); } };
+$("tv-next").onclick = () => { if (S.tv.i < S.tv.list.length - 1) { S.tv.i++; paintTv(); } };
 $("lb-close").onclick = closeLb;
 $("lb-prev").onclick = () => { if (S.lb > 0) { S.lb--; paintLb(); } };
 $("lb-next").onclick = () => { if (S.lb < S.lbList.length - 1) { S.lb++; paintLb(); } };
 document.addEventListener("keydown", e => {
   if (!$("lb").hidden) { if (e.key === "Escape") closeLb(); if (e.key === "ArrowLeft") $("lb-prev").click(); if (e.key === "ArrowRight") $("lb-next").click(); }
-  if (e.key === "Escape") { $("taxi").hidden = true; $("sheet").hidden = true; }
+  if (e.key === "Escape") { $("taxi").hidden = true; $("sheet").hidden = true; if (!$("tv").hidden) closeTv(); }
 });

@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <div class="wrap">
@@ -142,6 +142,32 @@
     <div id="e-list"><p class="empty">Loading…</p></div>
   </section>
 
+  <section class="panel" id="p-tickets" aria-labelledby="h-tickets" hidden>
+    <h2 class="sec" id="h-tickets">Tickets</h2>
+    <p class="lede">Saved on your phone, so they open at the gate without signal. Turn your screen brightness up before scanning.</p>
+    <div id="k-list"><p class="empty">Loading tickets…</p></div>
+    <button type="button" class="btn ghost" id="k-new" style="margin-top:10px">Add a ticket</button>
+    <form class="compose" id="k-form" hidden>
+      <input id="k-title" type="text" placeholder="What is it? e.g. teamLab Planets" maxlength="80" required aria-label="Ticket name">
+      <div class="inline flow">
+        <select id="k-day" aria-label="Which day"></select>
+        <input id="k-time" type="time" aria-label="Time" style="width:auto">
+      </div>
+      <input id="k-number" type="text" placeholder="Ticket or booking number" maxlength="80" aria-label="Ticket number">
+      <input id="k-link" type="url" placeholder="Ticket link (optional)" maxlength="500" aria-label="Ticket link">
+      <div class="inline flow">
+        <label class="btn ghost uplabel" for="k-file">Add QR or ticket screenshot<input id="k-file" type="file" accept="image/*"></label>
+        <span class="muted small" id="k-filename"></span>
+      </div>
+      <input id="k-note" type="text" placeholder="Note, e.g. Show at east entrance" maxlength="160" aria-label="Note">
+      <div class="inline end">
+        <button type="button" class="btn ghost" id="k-cancel">Cancel</button>
+        <button class="btn" type="submit" id="k-save">Save ticket</button>
+      </div>
+      <p class="muted small" id="k-msg" aria-live="polite"></p>
+    </form>
+  </section>
+
   <section class="panel" id="p-contacts" aria-labelledby="h-contacts" hidden>
     <h2 class="sec" id="h-contacts">Contacts</h2>
     <p class="lede">Tap "Show driver" to display a hotel address in Japanese, full screen.</p>
@@ -221,6 +247,19 @@
   </div>
 </div>
 
+<div class="tv" id="tv" hidden role="dialog" aria-modal="true" aria-labelledby="tv-title">
+  <div class="tv-top"><span id="tv-pos"></span><button type="button" id="tv-close">Close</button></div>
+  <div class="tv-body">
+    <h2 id="tv-title"></h2>
+    <p id="tv-when"></p>
+    <img id="tv-img" alt="">
+    <p class="tv-num" id="tv-num"></p>
+    <p id="tv-note"></p>
+    <a id="tv-link" class="btn" target="_blank" rel="noopener" hidden>Open ticket link</a>
+  </div>
+  <div class="tv-nav"><button type="button" id="tv-prev">Previous</button><button type="button" id="tv-next">Next</button></div>
+</div>
+
 <div class="taxi" id="taxi" hidden role="dialog" aria-modal="true" aria-label="Address for the driver">
   <div class="k">Please take me here / こちらまでお願いします</div>
   <div class="big" id="taxi-jp"></div>
@@ -228,6 +267,6 @@
   <button type="button" class="btn" id="taxi-close">Done</button>
 </div>
 
-<script type="module" src="app.js?v=5"></script>
+<script type="module" src="app.js?v=6"></script>
 </body>
 </html>
