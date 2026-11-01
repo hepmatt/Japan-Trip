@@ -246,3 +246,8 @@ nav.tabs a{font-size:.68rem;padding:6px 0}
 .confnum{font-family:var(--mono);font-size:1.05rem;font-variant-numeric:tabular-nums;user-select:all;overflow-wrap:anywhere}
 .hconf-form{display:grid;gap:4px;margin-top:6px}
 .hconf-form input{width:100%;font:inherit;font-family:var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;flex:1}
+.taxi .big{white-space:pre-line}
+.hdetails{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.hdetails summary{cursor:pointer;font-weight:700;font-size:.88rem;color:var(--ai);padding:4px 0}
+.hdetails h5{margin:10px 0 2px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.hdetails ul{margin:0;padding-left:1.1rem;font-size:.86rem;display:grid;gap:3px}
