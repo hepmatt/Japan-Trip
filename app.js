@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=8";
+import { firebaseConfig } from "./firebase-config.js?v=9";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -156,8 +156,8 @@ function renderContacts() {
   const hotels = S.trip?.hotels || [];
   $("hotels").innerHTML = hotels.length
     ? hotels.map((h, i) => `<div class="contact"><div class="row"><b>${esc(h.name)}</b></div>${h.phone ? `<div class="num">${esc(h.phone)}</div>` : ""}${h.en ? `<div class="cnote">${esc(h.en)}</div>` : ""}${h.jp ? `<div class="jp">${esc(h.jp)}</div>` : ""}${h.note ? `<div class="cnote">${esc(h.note)}</div>` : ""}${S.hEdit === i
-      ? `<form class="hconf-form" data-hidx="${i}"><label class="k" for="h-conf">Confirmation number</label><div class="inline"><input id="h-conf" type="text" maxlength="60" value="${esc(h.conf || "")}" autocomplete="off"><button class="btn" type="submit">Save</button><button type="button" class="btn ghost" data-hcancel="1">Cancel</button></div></form>`
-      : `<div class="conf"><span class="k">Confirmation</span>${h.conf ? `<span class="confnum">${esc(h.conf)}</span>` : `<span class="muted small">Not added yet</span>`}</div>`}<div class="acts">${h.conf ? `<button type="button" data-copy="${esc(h.conf)}">Copy confirmation</button>` : ""}<button type="button" data-hedit="${i}">${h.conf ? "Edit" : "Add"} confirmation</button>${h.phone ? `<button type="button" data-copy="${esc(h.phone)}">Copy number</button><a href="${telHref(h.phone)}">Call</a>` : ""}${h.jp ? `<button type="button" data-taxi="${i}">Show driver</button>` : ""}${h.en ? `<a href="${gmap(h.en)}" target="_blank" rel="noopener">Map</a>` : ""}</div></div>`).join("")
+      ? `<form class="hconf-form" data-hidx="${i}"><label class="k" for="h-conf">Confirmation number</label><input id="h-conf" type="text" maxlength="60" value="${esc(h.conf || "")}" autocomplete="off"><label class="k" for="h-guest">Reserved under</label><input id="h-guest" type="text" maxlength="60" value="${esc(h.guest || "")}" autocomplete="off"><div class="inline end" style="margin-top:6px"><button type="button" class="btn ghost" data-hcancel="1">Cancel</button><button class="btn" type="submit">Save</button></div></form>`
+      : `<div class="conf"><span class="k">Confirmation</span>${h.conf ? `<span class="confnum">${esc(h.conf)}</span>` : `<span class="muted small">Not added yet</span>`}</div>${h.guest ? `<div class="cnote">Reserved under <b>${esc(h.guest)}</b></div>` : ""}`}<div class="acts">${h.conf ? `<button type="button" data-copy="${esc(h.conf)}">Copy confirmation</button>` : ""}<button type="button" data-hedit="${i}">${h.conf ? "Edit" : "Add"} confirmation</button>${h.phone ? `<button type="button" data-copy="${esc(h.phone)}">Copy number</button><a href="${telHref(h.phone)}">Call</a>` : ""}${h.jp ? `<button type="button" data-taxi="${i}">Show driver</button>` : ""}${h.en ? `<a href="${gmap(h.en)}" target="_blank" rel="noopener">Map</a>` : ""}</div></div>`).join("")
     : `<p class="empty">Hotels load with your trip data.</p>`;
 }
 function renderOurs() {
@@ -576,6 +576,7 @@ async function start() {
     const i = +f.dataset.hidx, hotels = JSON.parse(JSON.stringify(S.trip?.hotels || []));
     if (!hotels[i]) return;
     hotels[i].conf = $("h-conf").value.trim();
+    hotels[i].guest = $("h-guest").value.trim();
     try { await F.updateDoc(F.doc(db, "trip", "main"), { hotels }); S.hEdit = null; renderContacts(); }
     catch (err) { toast("hotels", "Confirmation didn't save. Try again."); }
   });
@@ -671,8 +672,8 @@ async function importTrip(file, F) {
     const existing = new Set((await F.getDocs(F.collection(S.db, "todos"))).docs.map(d => d.id));
     const batch = F.writeBatch(S.db);
     if (Array.isArray(trip.hotels)) {
-      const prev = new Map((S.trip?.hotels || []).map(h => [h.name, h.conf]));
-      trip.hotels = trip.hotels.map(h => (h.conf || !prev.get(h.name) ? h : { ...h, conf: prev.get(h.name) }));
+      const prev = new Map((S.trip?.hotels || []).map(h => [h.name, h]));
+      trip.hotels = trip.hotels.map(h => { const o = prev.get(h.name) || {}; return { ...h, conf: h.conf || o.conf || "", guest: h.guest || o.guest || "" }; });
     }
     if (Array.isArray(trip.days)) batch.set(F.doc(S.db, "trip", "main"), { ...trip, updatedAt: Date.now() });
     tickets.forEach(k => { if (k && k.id && k.title) { const { id, ...rest } = k; batch.set(F.doc(S.db, "tickets", String(id)), { ...rest, by: S.uid, at: Date.now() }); } });

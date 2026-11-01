@@ -245,4 +245,4 @@ nav.tabs a{font-size:.68rem;padding:6px 0}
 .conf{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-top:6px}
 .confnum{font-family:var(--mono);font-size:1.05rem;font-variant-numeric:tabular-nums;user-select:all;overflow-wrap:anywhere}
 .hconf-form{display:grid;gap:4px;margin-top:6px}
-.hconf-form input{font:inherit;font-family:var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;flex:1}
+.hconf-form input{width:100%;font:inherit;font-family:var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;flex:1}
