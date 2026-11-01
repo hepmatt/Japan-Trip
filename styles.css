@@ -251,3 +251,5 @@ nav.tabs a{font-size:.68rem;padding:6px 0}
 .hdetails summary{cursor:pointer;font-weight:700;font-size:.88rem;color:var(--ai);padding:4px 0}
 .hdetails h5{margin:10px 0 2px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .hdetails ul{margin:0;padding-left:1.1rem;font-size:.86rem;display:grid;gap:3px}
+.syncbar{border-color:var(--ai);background:var(--ai-soft);margin-top:18px}
+.syncbar input,#s-pass-form input{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;flex:1}

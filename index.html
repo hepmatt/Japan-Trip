@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 <div class="wrap">
@@ -57,6 +57,12 @@
   </section>
 
   <section class="panel" id="p-plan" aria-labelledby="h-plan" hidden>
+    <form class="compose syncbar" id="syncbar" hidden>
+      <b>Turn on automatic trip updates</b>
+      <span class="muted small">Enter the trip passphrase once on this phone. After that, changes to your bookings and itinerary load on their own.</span>
+      <div class="inline"><input id="sync-pass" type="password" autocomplete="current-password" placeholder="Trip passphrase" aria-label="Trip passphrase"><button class="btn" type="submit">Unlock</button></div>
+      <span class="muted small" id="sync-msg" aria-live="polite"></span>
+    </form>
     <h2 class="sec" id="h-plan">Itinerary</h2>
     <p class="lede">Red dots are locked. Gold still needs booking. Dashed blue is flexible.</p>
     <div class="strip"><div class="strip-in" id="strip"></div></div>
@@ -224,6 +230,9 @@
     <p class="muted" id="who-email"></p>
     <label for="s-name">Your name, as your partner sees it</label>
     <div class="inline"><input id="s-name" type="text" maxlength="30"><button type="button" class="btn ghost" id="s-save">Save</button></div>
+    <label for="s-pass">Automatic trip updates</label>
+    <p class="muted small" id="s-sync" aria-live="polite"></p>
+    <form class="inline" id="s-pass-form"><input id="s-pass" type="password" autocomplete="current-password" placeholder="Trip passphrase" aria-label="Trip passphrase"><button class="btn ghost" type="submit">Save</button><button class="btn ghost" type="button" id="s-sync-now">Check now</button></form>
     <label for="s-import">Load trip data</label>
     <p class="muted small">Pick a trip-data.json file. It updates the itinerary, hotels, and places, and adds any new checklist items without undoing checks.</p>
     <input id="s-import" type="file">
@@ -267,6 +276,6 @@
   <button type="button" class="btn" id="taxi-close">Done</button>
 </div>
 
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=12"></script>
 </body>
 </html>

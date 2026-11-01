@@ -1,7 +1,7 @@
 // Offline support: keeps the app shell and Firebase SDK cached so the app opens without signal.
 // Trip data itself is cached by Firestore's offline persistence, not here.
-const CACHE = "japan-trip-v11";
-const SHELL = ["./", "index.html", "styles.css?v=11", "app.js?v=11", "firebase-config.js?v=11", "manifest.webmanifest",
+const CACHE = "japan-trip-v12";
+const SHELL = ["./", "index.html", "styles.css?v=12", "app.js?v=12", "firebase-config.js?v=12", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

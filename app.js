@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=11";
+import { firebaseConfig } from "./firebase-config.js?v=12";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -394,7 +394,7 @@ async function start() {
       ALL_PANELS.forEach(t => ($("p-" + t).hidden = true));
       return;
     }
-    S.uid = user.uid; S.email = user.email;
+    S.uid = user.uid; S.email = user.email; setTimeout(paintSyncUI, 0);
     $("gate").hidden = true; $("tabs").hidden = false; $("acct-btn").hidden = false;
     let startTab = "plan"; try { startTab = localStorage.getItem("jt-tab") || "plan"; } catch (e) {}
     show(location.hash.slice(1) || startTab);
@@ -582,6 +582,12 @@ async function start() {
     catch (err) { toast("hotels", "Confirmation didn't save. Try again."); }
   });
 
+  /* automatic updates */
+  $("syncbar").addEventListener("submit", e => { e.preventDefault(); savePass($("sync-pass").value, F, $("sync-msg")); });
+  $("s-pass-form").addEventListener("submit", e => { e.preventDefault(); savePass($("s-pass").value, F, $("s-sync")); $("s-pass").value = ""; });
+  $("s-sync-now").onclick = () => autoSync(F, true);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoSync(F); });
+
   /* settings */
   $("acct-btn").onclick = () => { $("who-email").textContent = "Signed in as " + (S.email || ""); $("s-name").value = S.users[S.uid]?.name || ""; $("s-msg").textContent = ""; $("sheet").hidden = false; $("s-name").focus(); };
   $("s-close").onclick = () => ($("sheet").hidden = true);
@@ -604,6 +610,7 @@ function subscribe(F) {
   };
   S.unsubs.push(F.onSnapshot(F.doc(db, "trip", "main"), snap => {
     S.trip = snap.exists() ? snap.data() : null;
+    if (!snap.metadata?.fromCache) autoSync(F);
     renderHeader(); renderPlan(); renderMap(); renderContacts(); fillDaySelect(); renderPhotos(); renderJournal(); renderEats(); tick();
   }, onErr("trip")));
   S.unsubs.push(F.onSnapshot(F.collection(db, "todos"), snap => {
@@ -664,35 +671,86 @@ async function uploadFiles(files, F, ST) {
   $("p-file").value = "";
 }
 
+async function applyTripData(data, F) {
+  if (!data || (!Array.isArray(data.days) && !Array.isArray(data.tickets))) throw new Error("bad");
+  const { todos = [], tickets = [], ...trip } = data;
+  const existing = new Set((await F.getDocs(F.collection(S.db, "todos"))).docs.map(d => d.id));
+  const batch = F.writeBatch(S.db);
+  if (Array.isArray(trip.hotels)) {
+    const prev = new Map((S.trip?.hotels || []).map(h => [h.name, h]));
+    trip.hotels = trip.hotels.map(h => { const o = prev.get(h.name) || {}; return { ...h, conf: h.conf || o.conf || "", guest: h.guest || o.guest || "", loyalty: h.loyalty || o.loyalty || "" }; });
+  }
+  if (Array.isArray(trip.days)) batch.set(F.doc(S.db, "trip", "main"), { ...trip, dataVersion: +data.version || 0, updatedAt: Date.now() });
+  tickets.forEach(k => { if (k && k.id && k.title) { const { id, ...rest } = k; batch.set(F.doc(S.db, "tickets", String(id)), { ...rest, by: S.uid, at: Date.now() }); } });
+  let added = 0, updated = 0;
+  todos.forEach(t => {
+    if (!t || !t.id || !t.text) return;
+    const { id, done, doneBy, doneAt, ...rest } = t;
+    const r = F.doc(S.db, "todos", String(id));
+    if (existing.has(String(id))) { batch.update(r, rest); updated++; }
+    else { batch.set(r, { ...rest, done: false }); added++; }
+  });
+  await batch.commit();
+  return [Array.isArray(trip.days) ? `Trip loaded: ${trip.days.length} days` : "", `${added} new checklist items, ${updated} updated`, tickets.length ? `${tickets.length} tickets` : ""].filter(Boolean).join(", ") + ".";
+}
 async function importTrip(file, F) {
   const msg = $("s-msg");
+  try { msg.textContent = await applyTripData(JSON.parse(await file.text()), F); }
+  catch (e) { console.error(e); msg.textContent = e?.message === "bad" ? "That file isn't a trip data file." : "Import didn't finish. Check your connection and try again."; }
+  $("s-import").value = "";
+}
+
+/* ---------- automatic, encrypted trip updates from the repo ---------- */
+const PASS_KEY = "jt-pass";
+function getPass() { try { return localStorage.getItem(PASS_KEY) || ""; } catch (e) { return ""; } }
+function setPass(v) { try { v ? localStorage.setItem(PASS_KEY, v) : localStorage.removeItem(PASS_KEY); } catch (e) {} }
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function decryptTrip(enc, pass) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(enc.salt), iterations: enc.iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, key, b64(enc.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function fetchEnc() {
+  const r = await fetch("data/trip.enc.json?t=" + Date.now(), { cache: "no-store" });
+  if (!r.ok) throw new Error("nofile");
+  return r.json();
+}
+function paintSyncUI(state) {
+  const has = !!getPass();
+  $("syncbar").hidden = has || !S.uid;
+  $("s-sync").textContent = state || (has ? "On. Trip updates load automatically when you open the app." : "Off. Enter the trip passphrase to turn on automatic updates.");
+}
+let syncing = false, lastSync = 0;
+async function autoSync(F, force) {
+  const pass = getPass();
+  if (!pass || !S.uid || syncing || !navigator.onLine) return;
+  if (!force && Date.now() - lastSync < 60e3) return;
+  syncing = true; lastSync = Date.now();
   try {
-    const data = JSON.parse(await file.text());
-    if (!data || (!Array.isArray(data.days) && !Array.isArray(data.tickets))) throw new Error("bad");
-    const { todos = [], tickets = [], ...trip } = data;
-    const existing = new Set((await F.getDocs(F.collection(S.db, "todos"))).docs.map(d => d.id));
-    const batch = F.writeBatch(S.db);
-    if (Array.isArray(trip.hotels)) {
-      const prev = new Map((S.trip?.hotels || []).map(h => [h.name, h]));
-      trip.hotels = trip.hotels.map(h => { const o = prev.get(h.name) || {}; return { ...h, conf: h.conf || o.conf || "", guest: h.guest || o.guest || "", loyalty: h.loyalty || o.loyalty || "" }; });
-    }
-    if (Array.isArray(trip.days)) batch.set(F.doc(S.db, "trip", "main"), { ...trip, updatedAt: Date.now() });
-    tickets.forEach(k => { if (k && k.id && k.title) { const { id, ...rest } = k; batch.set(F.doc(S.db, "tickets", String(id)), { ...rest, by: S.uid, at: Date.now() }); } });
-    let added = 0, updated = 0;
-    todos.forEach(t => {
-      if (!t || !t.id || !t.text) return;
-      const { id, done, doneBy, doneAt, ...rest } = t;
-      const r = F.doc(S.db, "todos", String(id));
-      if (existing.has(String(id))) { batch.update(r, rest); updated++; }
-      else { batch.set(r, { ...rest, done: false }); added++; }
-    });
-    await batch.commit();
-    msg.textContent = [Array.isArray(trip.days) ? `Trip loaded: ${trip.days.length} days` : "", `${added} new checklist items, ${updated} updated`, tickets.length ? `${tickets.length} tickets` : ""].filter(Boolean).join(", ") + ".";
+    const enc = await fetchEnc();
+    if (!force && (+enc.v || 0) <= (+S.trip?.dataVersion || 0)) { paintSyncUI(); return; }
+    const data = await decryptTrip(enc, pass);
+    const summary = await applyTripData(data, F);
+    paintSyncUI("Updated to trip data version " + (data.version || enc.v) + ". " + summary);
   } catch (e) {
     console.error(e);
-    msg.textContent = e?.message === "bad" ? "That file isn't a trip-data.json file." : "Import didn't finish. Check your connection and try again.";
+    if (e?.name === "OperationError") { setPass(""); paintSyncUI("That passphrase didn't unlock the trip data. Enter it again."); }
+    else paintSyncUI();
+  } finally { syncing = false; }
+}
+async function savePass(v, F, msgEl) {
+  v = v.trim(); if (!v) return;
+  msgEl.textContent = "Checking…";
+  try {
+    const enc = await fetchEnc();
+    await decryptTrip(enc, v);
+    setPass(v); msgEl.textContent = "Unlocked. Loading your trip…";
+    await autoSync(F, true);
+    msgEl.textContent = "";
+  } catch (e) {
+    msgEl.textContent = e?.name === "OperationError" ? "That passphrase doesn't match. Check capital letters and symbols." : "Couldn't reach the trip data. Check your connection.";
   }
-  $("s-import").value = "";
 }
 
 /* ---------- static UI events ---------- */
