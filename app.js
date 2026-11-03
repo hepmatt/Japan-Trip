@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=13";
+import { firebaseConfig } from "./firebase-config.js?v=14";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -777,6 +777,39 @@ async function savePass(v, F, msgEl) {
   }
 }
 
+/* ---------- currency converter (works offline with the last saved rate) ---------- */
+const FX_KEY = "jt-fx", FX_DEFAULT = 157.7;
+function fxLoad() { try { const v = JSON.parse(localStorage.getItem(FX_KEY) || "null"); if (v && v.rate > 50 && v.rate < 400) return v; } catch (e) {} return { rate: FX_DEFAULT, at: 0, src: "default" }; }
+function fxSave(v) { try { localStorage.setItem(FX_KEY, JSON.stringify(v)); } catch (e) {} }
+let FX = fxLoad();
+const fxNum = s => { const n = parseFloat(String(s).replace(/[^0-9.]/g, "")); return isFinite(n) ? n : NaN; };
+function fxPaintRate(msg) {
+  const when = FX.at ? new Date(FX.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+  $("fx-rate").textContent = msg || `1 USD = ¥${FX.rate.toFixed(2)} · ${FX.src === "live" ? "live rate, updated " + when : FX.src === "manual" ? "set by you" + (when ? " " + when : "") : "saved estimate; tap Update when you have signal"}`;
+  $("fx-rate-in").value = FX.rate.toFixed(2);
+}
+function fxFromJpy() { const y = fxNum($("fx-jpy").value); $("fx-usd").value = isNaN(y) ? "" : (y / FX.rate).toFixed(2); }
+function fxFromUsd() { const d = fxNum($("fx-usd").value); $("fx-jpy").value = isNaN(d) ? "" : Math.round(d * FX.rate).toLocaleString("en-US"); }
+async function fxRefresh(force) {
+  if (!navigator.onLine) { fxPaintRate(); return; }
+  if (!force && FX.src !== "manual" && Date.now() - (FX.at || 0) < 6 * 3600e3) return;
+  if (!force && FX.src === "manual") return;
+  try {
+    const r = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store" });
+    const j = await r.json(); const rate = +j?.rates?.JPY;
+    if (rate > 50 && rate < 400) { FX = { rate, at: Date.now(), src: "live" }; fxSave(FX); fxPaintRate(); fxFromJpy(); }
+    else fxPaintRate();
+  } catch (e) { fxPaintRate(force ? "Couldn't get a live rate. Using the saved one." : undefined); }
+}
+$("fx-btn").onclick = () => { $("fx").hidden = false; fxPaintRate(); fxRefresh(false); $("fx-jpy").focus(); };
+$("fx-close").onclick = () => ($("fx").hidden = true);
+$("fx").addEventListener("click", e => { if (e.target.id === "fx") $("fx").hidden = true; });
+$("fx-jpy").addEventListener("input", fxFromJpy);
+$("fx-usd").addEventListener("input", fxFromUsd);
+$("fx-refresh").onclick = () => fxRefresh(true);
+$("fx-rate-form").addEventListener("submit", e => { e.preventDefault(); const v = fxNum($("fx-rate-in").value); if (v > 50 && v < 400) { FX = { rate: v, at: Date.now(), src: "manual" }; fxSave(FX); fxPaintRate(); fxFromJpy(); } });
+document.addEventListener("click", e => { const b = e.target.closest("[data-fx]"); if (!b) return; $("fx-jpy").value = (+b.dataset.fx).toLocaleString("en-US"); fxFromJpy(); });
+
 /* ---------- static UI events ---------- */
 document.addEventListener("click", e => {
   const c = e.target.closest(".chip"); if (c) { $("d-" + c.dataset.d)?.scrollIntoView({ block: "start" }); return; }
@@ -814,5 +847,5 @@ $("lb-prev").onclick = () => { if (S.lb > 0) { S.lb--; paintLb(); } };
 $("lb-next").onclick = () => { if (S.lb < S.lbList.length - 1) { S.lb++; paintLb(); } };
 document.addEventListener("keydown", e => {
   if (!$("lb").hidden) { if (e.key === "Escape") closeLb(); if (e.key === "ArrowLeft") $("lb-prev").click(); if (e.key === "ArrowRight") $("lb-next").click(); }
-  if (e.key === "Escape") { $("taxi").hidden = true; $("sheet").hidden = true; if (!$("tv").hidden) closeTv(); }
+  if (e.key === "Escape") { $("taxi").hidden = true; $("sheet").hidden = true; $("fx").hidden = true; if (!$("tv").hidden) closeTv(); }
 });

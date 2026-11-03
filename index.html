@@ -17,13 +17,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="row">
       <h1 id="title">Our Japan Trip</h1>
+      <button type="button" class="fxbtn" id="fx-btn" aria-label="Currency converter">¥ ⇄ $</button>
       <button type="button" class="acct" id="acct-btn" hidden aria-label="Account and settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
       </button>
@@ -241,6 +242,22 @@
   </div>
 </div>
 
+<div class="sheet-bg" id="fx" hidden role="dialog" aria-modal="true" aria-labelledby="fx-h">
+  <div class="sheet">
+    <h2 id="fx-h">Yen ⇄ Dollars</h2>
+    <label for="fx-jpy">Japanese yen</label>
+    <div class="fxrow"><span class="fxcur">¥</span><input id="fx-jpy" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+    <label for="fx-usd">US dollars</label>
+    <div class="fxrow"><span class="fxcur">$</span><input id="fx-usd" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div class="fxchips" role="group" aria-label="Common amounts">
+      <button type="button" data-fx="500">¥500</button><button type="button" data-fx="1000">¥1,000</button><button type="button" data-fx="3000">¥3,000</button><button type="button" data-fx="5000">¥5,000</button><button type="button" data-fx="10000">¥10,000</button><button type="button" data-fx="20000">¥20,000</button>
+    </div>
+    <p class="muted small" id="fx-rate"></p>
+    <form class="inline" id="fx-rate-form"><label for="fx-rate-in" class="small muted" style="margin:0">1 USD = ¥</label><input id="fx-rate-in" type="text" inputmode="decimal" style="flex:1"><button type="submit" class="btn ghost">Set rate</button><button type="button" class="btn ghost" id="fx-refresh">Update</button></form>
+    <div class="inline end"><button type="button" class="btn" id="fx-close">Done</button></div>
+  </div>
+</div>
+
 <div class="lightbox" id="lb" hidden role="dialog" aria-modal="true" aria-label="Photo">
   <div class="top"><span id="lb-pos"></span><button type="button" id="lb-close">Close</button></div>
   <div class="img"><img id="lb-img" alt=""></div>
@@ -276,6 +293,6 @@
   <button type="button" class="btn" id="taxi-close">Done</button>
 </div>
 
-<script type="module" src="app.js?v=13"></script>
+<script type="module" src="app.js?v=14"></script>
 </body>
 </html>
