@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=12";
+import { firebaseConfig } from "./firebase-config.js?v=13";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -94,8 +94,32 @@ function renderPlan() {
     let now = -1; if (x.d === today) evs.forEach((e, i) => { if (e.t <= nowT) now = i; });
     const items = evs.map((e, i) => `<li class="ev ${esc(e.s)}${i === now ? " now" : ""}"><span class="t">${esc(e.t)}</span><div class="card"><div class="row"><h4>${esc(e.h)}</h4><span class="tag ${esc(e.s)}">${TAG[e.s] || ""}</span></div>${e.p ? `<p>${esc(e.p)}</p>` : ""}${e.steps ? `<ol class="steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}</div></li>`).join("");
     const nt = (S.tickets || []).filter(k => k.day === x.d).length;
-    return `<section class="day" id="d-${esc(x.d)}"><div class="day-h"><h3>${esc(x.dow)}, ${fmt(x.d)}</h3><span class="city ${esc(x.city)}">${esc(x.cityL)}</span>${nt ? `<button type="button" class="tixbtn" data-tday="${esc(x.d)}">Tickets (${nt})</button>` : ""}</div><p class="stay">${esc(x.stay)}</p>${items ? `<ol class="rail">${items}</ol>` : `<p class="empty">Nothing in this filter.</p>`}</section>`;
+    return `<section class="day" id="d-${esc(x.d)}"><div class="day-h"><h3>${esc(x.dow)}, ${fmt(x.d)}</h3><span class="city ${esc(x.city)}">${esc(x.cityL)}</span>${nt ? `<button type="button" class="tixbtn" data-tday="${esc(x.d)}">Tickets (${nt})</button>` : ""}</div><p class="stay">${esc(x.stay)}</p>${x.guide ? guideHTML(x.guide) : ""}${items ? `<ol class="rail">${items}</ol>` : `<p class="empty">Nothing in this filter.</p>`}</section>`;
   }).join("");
+}
+
+/* ---------- day guides (route map + steps), drawn from trip data ---------- */
+function guideMap(m) {
+  const pts = m.points || []; if (pts.length < 2) return "";
+  const W = 640, H = 400, pad = 40, lat0 = pts.reduce((a, p) => a + p.lat, 0) / pts.length, kx = Math.cos(lat0 * Math.PI / 180);
+  const xs = pts.map(p => p.lon * kx), ys = pts.map(p => p.lat);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const sc = Math.min((W - 2 * pad - 120) / (maxX - minX || 1), (H - 2 * pad) / (maxY - minY || 1));
+  const ox = pad + 60 + ((W - 2 * pad - 120) - (maxX - minX) * sc) / 2, oy = pad + ((H - 2 * pad) - (maxY - minY) * sc) / 2;
+  const P = p => [(ox + (p.lon * kx - minX) * sc).toFixed(1), (oy + (maxY - p.lat) * sc).toFixed(1)];
+  const byId = Object.fromEntries(pts.map(p => [p.id, p]));
+  const routes = (m.routes || []).map(r => `<polyline class="gr ${esc(r.style || "main")}" points="${r.path.map(id => byId[id] ? P(byId[id]).join(",") : "").filter(Boolean).join(" ")}"/>`).join("");
+  const dots = pts.filter(p => p.label).map(p => { const [x, y] = P(p); const a = p.anchor || "start", dx = a === "end" ? -10 : a === "middle" ? 0 : 10, dy = p.dy ?? 4;
+    return `<circle cx="${x}" cy="${y}" r="${p.kind === "end" ? 7 : 4.5}" class="gd ${esc(p.kind || "")}"/><text x="${+x + dx}" y="${+y + dy}" text-anchor="${a}" class="gl2 ${p.kind === "end" || p.kind === "start" ? "big" : ""}">${esc(p.label)}</text>`; }).join("");
+  const legend = (m.routes || []).filter(r => r.name).map((r, i) => `<g transform="translate(12,${H - 14 - ((m.routes || []).filter(r => r.name).length - 1 - i) * 18})"><line x1="0" x2="26" y1="0" y2="0" class="gr ${esc(r.style || "main")}"/><text x="34" y="4" class="gleg">${esc(r.name)}</text></g>`).join("");
+  return `<div class="gmap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(m.alt || "Route map")}"><style>
+    .gr{fill:none;stroke-linecap:round;stroke-linejoin:round}.gr.main{stroke:var(--ai);stroke-width:4}.gr.alt{stroke:var(--kin);stroke-width:2.5;stroke-dasharray:7 6}.gr.walk{stroke:var(--matcha);stroke-width:2.5;stroke-dasharray:2 5}
+    .gd{fill:var(--surface);stroke:var(--ink);stroke-width:1.6}.gd.start,.gd.end{fill:var(--shu);stroke:var(--shu)}
+    .gl2{fill:var(--ink);font:12px var(--body)}.gl2.big{font-weight:700;font-size:14px}.gleg{fill:var(--muted);font:11px var(--body)}
+  </style>${routes}${dots}<g>${legend}</g></svg></div>`;
+}
+function guideHTML(g) {
+  return `<details class="guide"${g.open ? " open" : ""}><summary>${esc(g.title || "Guide")}</summary>${g.map ? guideMap(g.map) : ""}${(g.links || []).length ? `<div class="glinks">${g.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div>` : ""}${(g.sections || []).map((sec, i) => `<div class="gsec"><h5><span class="gn">${i + 1}</span>${esc(sec.h)}</h5>${sec.time ? `<div class="gtime">${esc(sec.time)}</div>` : ""}<ul>${(sec.items || []).map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>`).join("")}${g.footer ? `<p class="gfoot">${esc(g.footer)}</p>` : ""}</details>`;
 }
 
 /* ---------- map ---------- */

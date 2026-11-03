@@ -253,3 +253,16 @@ nav.tabs a{font-size:.68rem;padding:6px 0}
 .hdetails ul{margin:0;padding-left:1.1rem;font-size:.86rem;display:grid;gap:3px}
 .syncbar{border-color:var(--ai);background:var(--ai-soft);margin-top:18px}
 .syncbar input,#s-pass-form input{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;flex:1}
+/* day guides */
+.guide{margin-top:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ai);border-radius:10px;padding:8px 12px}
+.guide summary{cursor:pointer;font-weight:700;color:var(--ai);padding:4px 0}
+.gmap{margin:8px 0;overflow-x:auto}
+.gmap svg{display:block;width:100%;min-width:300px;height:auto;background:var(--bg);border-radius:8px}
+.glinks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.glinks a{font-size:.8rem;font-weight:700;text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px;background:var(--bg)}
+.gsec{margin-top:12px}
+.gsec h5{display:flex;align-items:center;gap:8px;margin:0;font-size:.95rem}
+.gn{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--ai);color:var(--surface);display:grid;place-items:center;font-size:.75rem;font-family:var(--mono)}
+.gtime{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin:2px 0 0 30px}
+.gsec ul{margin:4px 0 0 30px;padding-left:1rem;font-size:.88rem;display:grid;gap:4px}
+.gfoot{font-size:.82rem;color:var(--muted);margin:12px 0 4px}
