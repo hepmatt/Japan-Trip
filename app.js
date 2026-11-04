@@ -1,4 +1,4 @@
-import { firebaseConfig } from "./firebase-config.js?v=14";
+import { firebaseConfig } from "./firebase-config.js?v=15";
 
 const SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
 
@@ -94,7 +94,7 @@ function renderPlan() {
     let now = -1; if (x.d === today) evs.forEach((e, i) => { if (e.t <= nowT) now = i; });
     const items = evs.map((e, i) => `<li class="ev ${esc(e.s)}${i === now ? " now" : ""}"><span class="t">${esc(e.t)}</span><div class="card"><div class="row"><h4>${esc(e.h)}</h4><span class="tag ${esc(e.s)}">${TAG[e.s] || ""}</span></div>${e.p ? `<p>${esc(e.p)}</p>` : ""}${e.steps ? `<ol class="steps">${e.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}</div></li>`).join("");
     const nt = (S.tickets || []).filter(k => k.day === x.d).length;
-    return `<section class="day" id="d-${esc(x.d)}"><div class="day-h"><h3>${esc(x.dow)}, ${fmt(x.d)}</h3><span class="city ${esc(x.city)}">${esc(x.cityL)}</span>${nt ? `<button type="button" class="tixbtn" data-tday="${esc(x.d)}">Tickets (${nt})</button>` : ""}</div><p class="stay">${esc(x.stay)}</p>${x.guide ? guideHTML(x.guide) : ""}${items ? `<ol class="rail">${items}</ol>` : `<p class="empty">Nothing in this filter.</p>`}</section>`;
+    return `<section class="day" id="d-${esc(x.d)}"><div class="day-h"><h3>${esc(x.dow)}, ${fmt(x.d)}</h3><span class="city ${esc(x.city)}">${esc(x.cityL)}</span>${nt ? `<button type="button" class="tixbtn" data-tday="${esc(x.d)}">Tickets (${nt})</button>` : ""}</div><p class="stay">${esc(x.stay)}</p>${(x.guides || (x.guide ? [x.guide] : [])).map(guideHTML).join("")}${items ? `<ol class="rail">${items}</ol>` : `<p class="empty">Nothing in this filter.</p>`}</section>`;
   }).join("");
 }
 
@@ -110,11 +110,13 @@ function guideMap(m) {
   const byId = Object.fromEntries(pts.map(p => [p.id, p]));
   const routes = (m.routes || []).map(r => `<polyline class="gr ${esc(r.style || "main")}" points="${r.path.map(id => byId[id] ? P(byId[id]).join(",") : "").filter(Boolean).join(" ")}"/>`).join("");
   const dots = pts.filter(p => p.label).map(p => { const [x, y] = P(p); const a = p.anchor || "start", dx = a === "end" ? -10 : a === "middle" ? 0 : 10, dy = p.dy ?? 4;
-    return `<circle cx="${x}" cy="${y}" r="${p.kind === "end" ? 7 : 4.5}" class="gd ${esc(p.kind || "")}"/><text x="${+x + dx}" y="${+y + dy}" text-anchor="${a}" class="gl2 ${p.kind === "end" || p.kind === "start" ? "big" : ""}">${esc(p.label)}</text>`; }).join("");
+    const g = `<circle cx="${x}" cy="${y}" r="${p.kind === "end" ? 7 : 4.5}" class="gd ${esc(p.kind || "")}"/>${p.num ? `<text x="${x}" y="${+y + 4}" text-anchor="middle" class="gnum">${esc(p.num)}</text>` : ""}<text x="${+x + dx}" y="${+y + dy}" text-anchor="${a}" class="gl2 ${p.kind === "end" || p.kind === "start" ? "big" : ""}">${esc(p.label)}</text>`;
+    return p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener" class="gtap"><title>Open ${esc(p.label)} in Maps</title>${g}</a>` : g; }).join("");
   const legend = (m.routes || []).filter(r => r.name).map((r, i) => `<g transform="translate(12,${H - 14 - ((m.routes || []).filter(r => r.name).length - 1 - i) * 18})"><line x1="0" x2="26" y1="0" y2="0" class="gr ${esc(r.style || "main")}"/><text x="34" y="4" class="gleg">${esc(r.name)}</text></g>`).join("");
   return `<div class="gmap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(m.alt || "Route map")}"><style>
     .gr{fill:none;stroke-linecap:round;stroke-linejoin:round}.gr.main{stroke:var(--ai);stroke-width:4}.gr.alt{stroke:var(--kin);stroke-width:2.5;stroke-dasharray:7 6}.gr.walk{stroke:var(--matcha);stroke-width:2.5;stroke-dasharray:2 5}
-    .gd{fill:var(--surface);stroke:var(--ink);stroke-width:1.6}.gd.start,.gd.end{fill:var(--shu);stroke:var(--shu)}
+    .gd{fill:var(--surface);stroke:var(--ink);stroke-width:1.6}.gd.start,.gd.end{fill:var(--shu);stroke:var(--shu)}.gd.stop{fill:var(--ai);stroke:var(--ai)}
+    .gnum{fill:#fff;font:700 9px var(--mono)}.gtap{cursor:pointer}.gtap:hover .gl2{text-decoration:underline}
     .gl2{fill:var(--ink);font:12px var(--body)}.gl2.big{font-weight:700;font-size:14px}.gleg{fill:var(--muted);font:11px var(--body)}
   </style>${routes}${dots}<g>${legend}</g></svg></div>`;
 }
